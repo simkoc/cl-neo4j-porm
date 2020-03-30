@@ -30,12 +30,8 @@
   (:documentation "print the entity object"))
 
 
-(defgeneric get-attribute (attribute-name entity)
+(defgeneric get-property (attribute-name entity)
   (:documentation "get the attribute attribute-name from the entity"))
-
-
-(defmethod get-attribute (attribute-name (entity entity))
-  (gethash attribute-name (slot-value entity 'attribute-table)))
 
 
 (defmethod print-object ((entity entity) stream)
@@ -47,12 +43,19 @@
           :reader value)))
 
 
-(defun make-value-entity (json-column json-meta)
+(defun make-value-entity-using-meta (json-column json-meta)
+  (declare (ignore json-meta))
   (make-instance 'value
-                 :attribute-table (if (listp json-column)
-                                      (create-hash-table json-column)
-                                      (create-hash-table (list (cons 0 json-column))))
-                 :id (cdar json-meta)))
+                 :value json-column))
+
+
+(defmethod print-object ((entity value) stream)
+  (format stream "<~a>" (value entity)))
+
+
+(defmethod get-value ((entity value))
+  (warn "get-value is deprecated and will be dropped in future versions of cl-neo4j-porm")
+  (value entity))
 
 
 (defmethod get-entity-type ((entity value))
@@ -64,6 +67,20 @@
                :reader properties)
    (id :initarg :id
        :reader id)))
+
+
+(defmethod get-property (property (entity graph-entity))
+  (gethash property (slot-value entity 'properties)))
+
+
+(defmethod get-attribute (property (entity graph-entity))
+  (warn "get-attribute is deprecated and will be dropped in future versions of cl-neo4j-porm")
+  (get-property property entity))
+
+
+(defmethod get-id ((entity graph-entity))
+  (warn "get-id is deprecated and will be dropped in future versions of cl-neo4j-porm")
+  (id entity))
 
 
 (defclass node (graph-entity)
@@ -95,7 +112,7 @@
                  :properties (if (listp json-column)
                                  (create-hash-table json-column)
                                  (create-hash-table (list (cons 0 json-column))))
-                 :id (parse-integer (cdar json-meta))))
+                 :id (cdar json-meta)))
 
 
 (defun make-node-entity (json-column)
@@ -170,6 +187,14 @@
                   :reader relationships)
    (node-index :initform (make-hash-table))
    (relationship-index :initform (make-hash-table))))
+
+
+(defmethod node ((id integer) (graph graph))
+  (gethash id (slot-value graph 'node-index)))
+
+
+(defmethod relationship ((id integer) (graph graph))
+  (gethash id (slot-value graph 'relationship-index)))
 
 
 (defmethod initialize-instance :after ((graph graph) &rest stuff)

@@ -54,7 +54,7 @@
     ((string= (cdadr json-meta) "relationship")
      (make-relationship-entity-using-meta json-column json-meta))
     (T
-     (make-value-entity json-column json-meta))))
+     (make-value-entity-using-meta json-column json-meta))))
 
 
 (defun parse-row (json-row)
