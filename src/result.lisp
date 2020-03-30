@@ -62,29 +62,35 @@
 
 
 (defun parse-graph (graph-element)
-  (make-instance 'graph
-                 :nodes (mapcar #'make-node-entity (nth 0 graph-element))
-                 :relationships (mapcar #'make-relationship-entity (nth 1 graph-element))))
+  (destructuring-bind (graph-label nodes relationships)
+      graph-element
+    (assert (string= graph-label "GRAPH"))
+    (make-instance 'graph
+                   :nodes (mapcar #'make-node-entity (cdr nodes))
+                   :relationships (mapcar #'make-relationship-entity (cdr relationships)))))
 
 
 (defun parse-data (data-list)
-  (mapcar (lambda (data-element)
-            (cond
-              ((and (= (length data-element) 2)
-                    (string= (car (nth 0 data-element)) "ROW")
-                    (string= (car (nth 1 data-element)) "META"))
-               (parse-row data-element))
-              ((and (= (length data-element) 1)
-                    (string= (car (nth 0 data-element)) "GRAPH"))
-               (parse-graph data-element))
-              (T
-               (error (format nil "do not know what to do with data-element ~a" data-element)))))
-          data-list))
+  (let ((graphs (list))
+        (rows (list)))
+    (mapcar (lambda (data-element)
+              (cond
+                ((and (= (length data-element) 2)
+                      (string= (car (nth 0 data-element)) "ROW")
+                      (string= (car (nth 1 data-element)) "META"))
+                 (push (parse-row data-element) rows))
+                ((and (= (length data-element) 1)
+                      (string= (car (nth 0 data-element)) "GRAPH"))
+                 (push (parse-graph (nth 0 data-element)) graphs))
+                (T
+                 (error (format nil "do not know what to do with data-element ~a" data-element)))))
+            data-list)
+    (values rows graphs)))
 
 
 (defun parse-results (json-list)
   (multiple-value-bind (rows graphs)
-      (parse-data (cdar json-list))
+      (parse-data (cdr (nth 1 (nth 1 (nth 0 json-list)))))
     (if rows
         (make-instance 'row-results
                        :rows rows

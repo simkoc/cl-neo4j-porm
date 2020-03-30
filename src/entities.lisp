@@ -39,14 +39,7 @@
 
 
 (defmethod print-object ((entity entity) stream)
-  (with-slots (id attribute-table)
-      entity
-    (let ((attribute-list (list)))
-      (maphash #'(lambda (key value)
-                   (push (list key value) attribute-list))
-               attribute-table)
-      (let ((string (format nil "(~a {~{~{~a:~a~}~^, ~}})" (get-type entity) attribute-list)))
-        (format stream string)))))
+  (format stream "(entity)"))
 
 
 (defclass value (entity)
@@ -77,61 +70,93 @@
   ((label :initarg :label
           :initform nil
           :reader label)
-   (in-relationships :initarg :relationships<-
+   (relationships<- :initarg :relationships<-
                      :initform (list)
                      :reader relationships<-)
-   (out-relationships :initarg :relationships->
+   (relationships-> :initarg :relationships->
                       :initform (list)
                       :reader relationships->)))
 
 
+(defmethod print-object ((entity node) stream)
+  (with-slots (id label properties)
+      entity
+    (let ((properties-list (list)))
+      (maphash #'(lambda (key value)
+                   (push (list key value) properties-list))
+               properties)
+      (let ((string (format nil "(:~a {~{~{~a:~a~}~^, ~}})" label properties-list)))
+        (format stream string)))))
+
+
 (defun make-node-entity-using-meta (json-column json-meta)
   (make-instance 'node
-                 :attribute-table (if (listp json-column)
-                                      (create-hash-table json-column)
-                                      (create-hash-table (list (cons 0 json-column))))
+                 :label ""
+                 :properties (if (listp json-column)
+                                 (create-hash-table json-column)
+                                 (create-hash-table (list (cons 0 json-column))))
                  :id (parse-integer (cdar json-meta))))
 
 
 (defun make-node-entity (json-column)
-  (make-instance 'node
-                 :id (parse-integer (cdr (nth 0 json-column)))
-                 :label (cdr (nth 1 json-column))
-                 :properties (progn (assert (listp (cdr (nth 2 json-column))))
-                                    (create-hash-table (cdr (nth 2 json-column))))))
+  (destructuring-bind (id labels properties)
+      json-column
+    (assert (listp (cdr properties)))
+    (make-instance 'node
+                   :id (parse-integer (cdr id))
+                   :label (cdr labels)
+                   :properties (create-hash-table (cdr properties)))))
 
 
 (defmethod get-entity-type ((entity node))
   :node)
 
 
-(defclass relationship (entity)
+(defclass relationship (graph-entity)
   ((start :initarg :start
           :reader start)
    (end :initarg :end
         :reader end)
-   (rel-type :initarg :type
-             :reader rel-type)
-   (properties :initarg :properties
-               :reader properties)))
+   (rel-type :initarg :rel-type
+             :reader rel-type)))
+
+
+(defmethod print-object ((entity relationship) stream)
+  (with-slots (id rel-type properties start end)
+      entity
+    (let ((properties-list (list)))
+      (maphash #'(lambda (key value)
+                   (push (list key value) properties-list))
+               properties)
+      (if (and (typep start 'node)
+               (typep end 'node))
+          (let ((string (format nil "(~a)-[:~a {~{~{~a:~a~}~^, ~}}]-(~a)" (id start) rel-type properties-list (id end))))
+            (format stream string))
+          (let ((string (format nil "[:~a {~{~{~a:~a~}~^, ~}}]" rel-type properties-list)))
+            (format stream string))))))
 
 
 (defun make-relationship-entity-using-meta (json-column json-meta)
   (make-instance 'relationship
-                 :attribute-table (if (listp json-column)
-                                      (create-hash-table json-column)
-                                      (create-hash-table (list (cons 0 json-column))))
-                 :id (parse-integer (cdar json-meta))))
+                 :properties (if (listp json-column)
+                                 (create-hash-table json-column)
+                                 (create-hash-table (list (cons 0 json-column))))
+                 :rel-type ""
+                 :start -1
+                 :end -1
+                 :id (cdar json-meta)))
 
 
 (defun make-relationship-entity (json-column)
-  (make-instance 'node
-                 :id (parse-integer (cdr (nth 0 json-column)))
-                 :type (cdr (nth 1 json-column))
-                 :start (parse-integer (cdr (nth 2 json-column)))
-                 :end (parse-integer (cdr (nth 3 json-column)))
-                 :properties (progn (assert (listp (cdr (nth 2 json-column))))
-                                    (create-hash-table (cdr (nth 2 json-column))))))
+  (destructuring-bind (id type start-node end-node properties)
+      json-column
+    (assert (listp (cdr properties)))
+    (make-instance 'relationship
+                   :id (parse-integer (cdr id))
+                   :rel-type (cdr type)
+                   :start (parse-integer (cdr start-node))
+                   :end (parse-integer (cdr end-node))
+                   :properties (create-hash-table (cdr properties)))))
 
 
 (defmethod get-type ((entity relationship))
@@ -151,15 +176,25 @@
   (declare (ignore stuff))
   (with-slots (nodes relationships node-index relationship-index)
       graph
+    (format t "~a~%~a~%" nodes relationships)
     (mapcar (lambda (node)
+              (assert (integerp (id node)))
               (setf (gethash (id node) node-index) node))
             nodes)
     (mapcar (lambda (relationship)
               (with-slots (id start end)
                   relationship
+                (assert (and (integerp start) (integerp end)))
                 (setf (gethash id relationship-index) relationship)
                 (push relationship (slot-value (gethash start node-index) 'relationships->))
                 (setf start (gethash start node-index))
-                (push relationship (slot-value (gethash end node-index) 'relationship<-))
+                (push relationship (slot-value (gethash end node-index) 'relationships<-))
                 (setf end (gethash end node-index))))
             relationships)))
+
+
+(defmethod print-object ((graph graph) stream)
+  (with-slots (nodes relationships)
+      graph
+    (format stream "<Graph~%~{~a~%~}~{~a~^~%~}>"
+            nodes relationships)))

@@ -12,10 +12,10 @@
                       :depends-on ("package"))
                (:file "entities"
                       :depends-on ("package"))
-               (:file "results"
+               (:file "result"
                       :depends-on ("package"
                                    "entities"))
                (:file "request"
                       :depends-on ("package"
                                    "connection"
-                                   "results"))))
+                                   "result"))))
