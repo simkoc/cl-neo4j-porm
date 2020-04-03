@@ -1,6 +1,23 @@
 (in-package :de.tu-braunschweig.cs.ias.cl-neo4j-porm)
 
 
+;; conditions
+
+(define-condition neo4j-porm-condition (condition)
+  ())
+
+
+(define-condition node-mismatch-condition (neo4j-porm-condition)
+  ((node-a :initarg :node-a)
+   (node-b :initarg :node-b)
+   (mismatch-explanation :initarg :mismatch-explanation)))
+
+
+(defmethod print-object ((condition node-mismatch-condition) stream)
+  (with-slots (node-a node-b mismatch-explanation)
+      condition
+    (format stream "mistmatch between ~a and ~a: ~a" node-a node-b mismatch-explanation)))
+
 ;; parsing utility
 
 
@@ -68,6 +85,14 @@
    (id :initarg :id
        :reader id)))
 
+(defmethod entity= ((node-lhs graph-entity) (node-rhs graph-entity) &rest nodes)
+  (labels ((helper (a b rem)
+             (if rem
+                 (and
+                  (= (id a) (id b))
+                  (helper a (car rem) (cdr rem)))
+                 (= (id a) (id b)))))
+    (helper node-lhs node-rhs nodes)))
 
 (defmethod get-property (property (entity graph-entity))
   (gethash property (slot-value entity 'properties)))
@@ -88,11 +113,96 @@
           :initform nil
           :reader label)
    (relationships<- :initarg :relationships<-
-                     :initform (list)
-                     :reader relationships<-)
+                     :initform (list))
    (relationships-> :initarg :relationships->
-                      :initform (list)
-                      :reader relationships->)))
+                      :initform (list))))
+
+
+(defmethod forget-graph-position ((node node))
+  (setf (slot-value node 'relationship<-) nil)
+  (setf (slot-value node 'relationship->) nil))
+
+
+(defmethod relationships-> ((node node) &key limit-to)
+  (with-slots (relationships->)
+      node
+    (if limit-to
+        (remove-if-not (lambda (rel)
+                         (find (rel-type rel) limit-to :test #'string=))
+                       relationships->)
+        relationships->)))
+
+
+(defmethod relationships<- ((node node) &key limit-to)
+  (with-slots (relationships->)
+      node
+    (if limit-to
+        (remove-if-not (lambda (rel)
+                         (find (rel-type rel) limit-to :test #'string=))
+                       relationships<-)
+        relationships<-)))
+
+
+(defmethod sync-nodes ((node-a node) (node-b node))
+  (when (not (= (id node-a) (id node-b)))
+    (error 'node-mismatch-condition
+           :node-a node-a
+           :node-b node-b
+           :mismatch-explanation "they have to have the same id"))
+  (let ((relationships-> (append (relationships-> node-a)
+                                 (relationships-> node-b)))
+        (relationships<- (append (relationships<- node-a)
+                                 (relationships<- node-b))))
+    (setf (slot-value node-a 'relationships->) relationships->)
+    (setf (slot-value node-a 'relationships<-) relationships<-)
+    (setf (slot-value node-b 'relationships->) relationships->)
+    (setf (slot-value node-b 'relationships<-) relationships<-))
+  (values node-a node-b))
+
+
+(defmethod relationships->* ((node node) (neo4j neo4j-connection) &key limit-to force-update)
+  (when (not (listp limit-to))
+    (setf limit-to (list limit-to)))
+  (let ((rels (relationships-> node :limit-to limit-to)))
+    (if (or (not rels)
+            force-update)
+        (let ((graph (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
+                                                     WHERE id(node) = {{start_node}} AND
+                                                           {}
+                                                     RETURN node, con, where"
+                                                (if limit-to
+                                                    "type(con) IN {limit_to}"
+                                                    "1 = 1"))
+                                  (cons "start_node" (id node))
+                                  (cons "limit_to" limit_to))))
+          (relationships-> (sync-nodes node (node (id node) graph)) :limit-to limit-to))
+        rels)))
+
+
+(defmethod relationships<-* ((node node) (neo4j neo4j-connection) &key limit-to force-update)
+  (when (not (listp limit-to))
+    (setf limit-to (list limit-to)))
+  (let ((rels (relationships<- node :limit-to limit-to)))
+    (if (or (not rels)
+            force-update)
+        (let ((graph (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
+                                                     WHERE id(node) = {{start_node}} AND
+                                                           {}
+                                                     RETURN node, con, where"
+                                                (if limit-to
+                                                    "type(con) IN {limit_to}"
+                                                    "1 = 1"))
+                                  (cons "start_node" (id node))
+                                  (cons "limit_to" limit_to))))
+          (relationships<- (sync-nodes node (node (id node) graph)) :limit-to limit-to))
+        rels)))
+
+
+
+(defmethod has-label-p ((entity node) label)
+  (if (find label (label entity) :test #'string=)
+      T
+      nil))
 
 
 (defmethod print-object ((entity node) stream)
@@ -197,11 +307,9 @@
   (gethash id (slot-value graph 'relationship-index)))
 
 
-(defmethod initialize-instance :after ((graph graph) &rest stuff)
-  (declare (ignore stuff))
+(defmethod initialize-graph-structure ((graph graph))
   (with-slots (nodes relationships node-index relationship-index)
       graph
-    (format t "~a~%~a~%" nodes relationships)
     (mapcar (lambda (node)
               (assert (integerp (id node)))
               (setf (gethash (id node) node-index) node))
@@ -216,6 +324,11 @@
                 (push relationship (slot-value (gethash end node-index) 'relationships<-))
                 (setf end (gethash end node-index))))
             relationships)))
+
+
+(defmethod initialize-instance :after ((graph graph) &rest stuff)
+  (declare (ignore stuff))
+  (initialize-graph-structure graph))
 
 
 (defmethod print-object ((graph graph) stream)

@@ -30,7 +30,7 @@
                                                                           '("row"))))))
 
 
-(defmethod query-request ((connection neo4j-connection) (statements statements))
+(defmethod query-request ((connection neo4j-connection) (statements statements) graph-p)
   (with-slots (user password)
       connection
     (let ((ret-string (utf-8-bytes-to-string
@@ -43,10 +43,11 @@
                                                (with-output-to-string (stream)
                                                  (encode-json statements stream)))))))
       (with-input-from-string (stream ret-string)
-        (parse-results (decode-json stream))))))
+        (parse-results (decode-json stream) t)))))
 
 
-(defmethod query-request-raw ((connection neo4j-connection) (statements statements))
+(defmethod query-request-raw ((connection neo4j-connection) (statements statements) graph-p)
+  (declare (ignore graph-p))
   (format t "~a~%" (replace-result-data-contents-in-json
                     (with-output-to-string (stream)
                       (encode-json statements stream))))
@@ -72,7 +73,8 @@
 
 (defmethod graph-query ((connection neo4j-connection) statement &rest parameters)
   (query-request connection
-                 (make-requestable-query statement parameters t)))
+                 (make-requestable-query statement parameters t)
+                 t))
 
 
 (defmethod simple-query-raw ((connection neo4j-connection) statement &rest parameters)
@@ -82,4 +84,5 @@
 
 (defmethod graph-query-raw ((connection neo4j-connection) statement &rest parameters)
   (query-request-raw connection
-                     (make-requestable-query statement parameters t)))
+                     (make-requestable-query statement parameters t)
+                     t))

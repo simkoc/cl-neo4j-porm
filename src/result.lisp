@@ -20,12 +20,19 @@
 (defmethod print-object ((results row-results) stream)
   (with-slots (rows errors)
       results
-    (format stream "~a~%~a~%" rows errors)))
+    (format stream "<ROWS ~a# E:~a#>" (length rows) (length errors))))
 
 
 (defclass graph-results (results)
   ((graphs :initarg :graphs
            :reader graphs)))
+
+
+(defmethod print-object ((results graph-results) stream)
+  (with-slots (graphs errors)
+      results
+    (format stream "<GRAPHS ~a# E:~a#>" (length graphs)
+            (length errors))))
 
 
 (defun flatten (list-of-lists)
@@ -88,10 +95,10 @@
     (values rows graphs)))
 
 
-(defun parse-results (json-list)
+(defun parse-results (json-list graph-p)
   (multiple-value-bind (rows graphs)
       (parse-data (cdr (nth 1 (nth 1 (nth 0 json-list)))))
-    (if rows
+    (if (not graph-p)
         (make-instance 'row-results
                        :rows rows
                        :errors (parse-errors (cdadr json-list)))
