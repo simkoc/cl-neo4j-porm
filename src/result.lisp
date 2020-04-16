@@ -112,8 +112,9 @@
 
 (defun parse-errors (json-error-list)
   (mapcar #'(lambda (json-error)
-              (error 'neo4j-query-error
-                     :format-control "~a~%~a"
-                     :format-arguments (list (cdar json-error)
-                                             (cdadr json-error))))
+              (destructuring-bind (code message)
+                  json-error
+                (error 'neo4j-query-error
+                       :format-control "~a:~a"
+                       :format-arguments (list (cdr code) (cdr message)))))
           json-error-list))

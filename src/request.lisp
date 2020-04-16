@@ -31,19 +31,26 @@
 
 
 (defmethod query-request ((connection neo4j-connection) (statements statements) graph-p)
-  (with-slots (user password)
-      connection
-    (let ((ret-string (utf-8-bytes-to-string
-                       (http-request (get-url connection)
-                                     :method :post
-                                     :basic-authorization (list user password)
-                                     :content-type "application/json"
-                                     :accept "application/json;charset=UTF-8"
-                                     :content (replace-result-data-contents-in-json
-                                               (with-output-to-string (stream)
-                                                 (encode-json statements stream)))))))
-      (with-input-from-string (stream ret-string)
-        (parse-results (decode-json stream) t)))))
+  (handler-case
+      (with-slots (user password)
+          connection
+        (let ((ret-string (utf-8-bytes-to-string
+                           (http-request (get-url connection)
+                                         :method :post
+                                         :basic-authorization (list user password)
+                                         :content-type "application/json"
+                                         :accept "application/json;charset=UTF-8"
+                                         :content (replace-result-data-contents-in-json
+                                                   (with-output-to-string (stream)
+                                                     (encode-json statements stream)))))))
+          (with-input-from-string (stream ret-string)
+            (parse-results (decode-json stream) t))))
+    (neo4j-query-error (e)
+      (error 'neo4j-query-error
+             :format-control "~a ran into error ~a"
+             :format-arguments (list (with-output-to-string (stream)
+                                       (encode-json statements stream))
+                                     e)))))
 
 
 (defmethod query-request-raw ((connection neo4j-connection) (statements statements) graph-p)
