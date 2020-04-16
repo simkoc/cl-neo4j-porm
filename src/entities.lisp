@@ -167,20 +167,19 @@
   (let ((rels (relationships-> node :limit-to limit-to)))
     (if (or (not rels)
             force-update)
-        (let ((result (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
-                                                     WHERE id(node) = {start_node} AND
-                                                           ~a
-                                                     RETURN node, con, where"
-                                                (if limit-to
-                                                    "type(con) IN {limit_to}"
-                                                    "1 = 1"))
-                                  (cons "start_node" (id node))
-                                  (cons "limit_to" limit-to))))
-          (assert (<= (length (graphs result)) 1))
-          (if (= (length (graphs result)) 0)
+        (let ((result (graphs (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
+                                                              WHERE id(node) = {start_node} AND
+                                                              ~a
+                                                              RETURN node, con, where"
+                                                         (if limit-to
+                                                             "type(con) IN {limit_to}"
+                                                             "1 = 1"))
+                                           (cons "start_node" (id node))
+                                           (cons "limit_to" limit-to)))))
+          (if (= (length result) 0)
               nil
               (progn
-                (sync-nodes node (node (id node) (car (graphs result))))
+                (sync-nodes node (node (id node) (apply #'merge-graphs (car result) (cdr result))))
                 (relationships-> node  :limit-to limit-to))))
         rels)))
 
@@ -191,20 +190,19 @@
   (let ((rels (relationships<- node :limit-to limit-to)))
     (if (or (not rels)
             force-update)
-        (let ((result (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
-                                                     WHERE id(node) = {start_node} AND
-                                                           ~a
-                                                     RETURN node, con, where"
-                                                (if limit-to
-                                                    "type(con) IN {limit_to}"
-                                                    "1 = 1"))
-                                  (cons "start_node" (id node))
-                                  (cons "limit_to" limit-to))))
-          (assert (<= (length (graphs result)) 1))
-          (if (= (length (graphs result)) 0)
+        (let ((result (graphs (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
+                                                              WHERE id(node) = {start_node} AND
+                                                              ~a
+                                                              RETURN node, con, where"
+                                                         (if limit-to
+                                                             "type(con) IN {limit_to}"
+                                                             "1 = 1"))
+                                           (cons "start_node" (id node))
+                                           (cons "limit_to" limit-to)))))
+          (if (= (length result) 0)
               nil
               (progn
-                (sync-nodes node (node (id node) (car (graphs result))))
+                (sync-nodes node (node (id node) (apply #'merge-graphs (car result) (cdr result))))
                 (relationships<- node  :limit-to limit-to))))
         rels)))
 
@@ -257,6 +255,13 @@
         :reader end)
    (rel-type :initarg :rel-type
              :reader rel-type)))
+
+
+(defmethod initialize-instance :after ((rel relationship) &rest rest)
+  (declare (ignore rest))
+  (with-slots (start end)
+      rel
+    (assert (and start end))))
 
 
 (defmethod print-object ((entity relationship) stream)
@@ -340,6 +345,34 @@
 (defmethod initialize-instance :after ((graph graph) &rest stuff)
   (declare (ignore stuff))
   (initialize-graph-structure graph))
+
+
+(defmethod delete-relationships-* ((node node))
+  (setf (slot-value node 'relationships->) nil)
+  (setf (slot-value node 'relationships<-) nil)
+  node)
+
+
+(defmethod revert-relationship-links-* ((rel relationship))
+  (if (not (integerp (slot-value rel 'start)))
+      (setf (slot-value rel 'start) (id (slot-value rel 'start))))
+  (if (not (integerp (slot-value rel 'end)))
+      (setf (slot-value rel 'end) (id (slot-value rel 'end))))
+  rel)
+
+
+(defmethod merge-graphs ((graph graph) &rest graphs)
+  (if (not graphs)
+      graph
+      (progn
+        (assert (typep (car graphs) 'graph))
+        (apply #'merge-graphs (make-instance 'graph
+                                             :nodes (mapcar #'delete-relationships-* (append (nodes graph)
+                                                                                             (nodes (car graphs))))
+                                             :relationships (mapcar #'revert-relationship-links-*
+                                                                    (append (relationships graph)
+                                                                            (relationships (car graphs)))))
+               (cdr graphs)))))
 
 
 (defmethod print-object ((graph graph) stream)
