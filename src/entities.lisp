@@ -134,7 +134,7 @@
 
 
 (defmethod relationships<- ((node node) &key limit-to)
-  (with-slots (relationships->)
+  (with-slots (relationships<-)
       node
     (if limit-to
         (remove-if-not (lambda (rel)
@@ -193,7 +193,7 @@
                                                     "type(con) IN {limit_to}"
                                                     "1 = 1"))
                                   (cons "start_node" (id node))
-                                  (cons "limit_to" limit_to))))
+                                  (cons "limit_to" limit-to))))
           (relationships<- (sync-nodes node (node (id node) graph)) :limit-to limit-to))
         rels)))
 
