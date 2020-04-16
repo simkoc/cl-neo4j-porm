@@ -128,6 +128,7 @@
       node
     (if limit-to
         (remove-if-not (lambda (rel)
+                         (format t "~a~%" (find (rel-type rel) limit-to :test #'string=))
                          (find (rel-type rel) limit-to :test #'string=))
                        relationships->)
         relationships->)))
@@ -178,7 +179,9 @@
           (assert (<= (length (graphs result)) 1))
           (if (= (length (graphs result)) 0)
               nil
-              (relationships-> (sync-nodes node (node (id node) (car (graphs result)))) :limit-to limit-to)))
+              (progn
+                (sync-nodes node (node (id node) (car (graphs result))))
+                (relationships-> node  :limit-to limit-to))))
         rels)))
 
 
@@ -200,7 +203,9 @@
           (assert (<= (length (graphs result)) 1))
           (if (= (length (graphs result)) 0)
               nil
-              (relationships<- (sync-nodes node (node (id node) (car (graphs result)))) :limit-to limit-to)))
+              (progn
+                (sync-nodes node (node (id node) (car (graphs result))))
+                (relationships<- node  :limit-to limit-to))))
         rels)))
 
 

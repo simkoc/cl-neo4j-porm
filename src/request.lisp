@@ -30,7 +30,14 @@
                                                                           '("row"))))))
 
 
+(defun print-request-content (statements)
+  (format t "~a~%" (replace-result-data-contents-in-json
+                    (with-output-to-string (stream)
+                      (encode-json statements stream)))))
+
+
 (defmethod query-request ((connection neo4j-connection) (statements statements) graph-p)
+  ;(print-request-content statements)
   (handler-case
       (with-slots (user password)
           connection
