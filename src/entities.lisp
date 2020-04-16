@@ -167,7 +167,7 @@
     (if (or (not rels)
             force-update)
         (let ((graph (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
-                                                     WHERE id(node) = {{start_node}} AND
+                                                     WHERE id(node) = {start_node} AND
                                                            {}
                                                      RETURN node, con, where"
                                                 (if limit-to
@@ -186,7 +186,7 @@
     (if (or (not rels)
             force-update)
         (let ((graph (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
-                                                     WHERE id(node) = {{start_node}} AND
+                                                     WHERE id(node) = {start_node} AND
                                                            {}
                                                      RETURN node, con, where"
                                                 (if limit-to
