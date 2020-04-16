@@ -20,7 +20,7 @@
 (defmethod print-object ((results row-results) stream)
   (with-slots (rows errors)
       results
-    (format stream "<ROWS ~a# E:~a#>" (length rows) (length errors))))
+    (format stream "<ROWS R:~a# E:~a#>" (length rows) (length errors))))
 
 
 (defclass graph-results (results)
@@ -31,7 +31,7 @@
 (defmethod print-object ((results graph-results) stream)
   (with-slots (graphs errors)
       results
-    (format stream "<GRAPHS ~a# E:~a#>" (length graphs)
+    (format stream "<GRAPHS G:~a# E:~a#>" (length graphs)
             (length errors))))
 
 

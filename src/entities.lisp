@@ -166,7 +166,7 @@
   (let ((rels (relationships-> node :limit-to limit-to)))
     (if (or (not rels)
             force-update)
-        (let ((graph (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
+        (let ((result (graph-query neo4j (format nil "MATCH (node)-[con]->(where)
                                                      WHERE id(node) = {start_node} AND
                                                            ~a
                                                      RETURN node, con, where"
@@ -174,8 +174,11 @@
                                                     "type(con) IN {limit_to}"
                                                     "1 = 1"))
                                   (cons "start_node" (id node))
-                                  (cons "limit_to" limit_to))))
-          (relationships-> (sync-nodes node (node (id node) graph)) :limit-to limit-to))
+                                  (cons "limit_to" limit-to))))
+          (assert (<= (length (graphs result)) 1))
+          (if (= (length (graphs result)) 0)
+              nil
+              (relationships-> (sync-nodes node (node (id node) (car (graphs result)))) :limit-to limit-to)))
         rels)))
 
 
@@ -185,7 +188,7 @@
   (let ((rels (relationships<- node :limit-to limit-to)))
     (if (or (not rels)
             force-update)
-        (let ((graph (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
+        (let ((result (graph-query neo4j (format nil "MATCH (node)<-[con]-(where)
                                                      WHERE id(node) = {start_node} AND
                                                            ~a
                                                      RETURN node, con, where"
@@ -194,7 +197,10 @@
                                                     "1 = 1"))
                                   (cons "start_node" (id node))
                                   (cons "limit_to" limit-to))))
-          (relationships<- (sync-nodes node (node (id node) graph)) :limit-to limit-to))
+          (assert (<= (length (graphs result)) 1))
+          (if (= (length (graphs result)) 0)
+              nil
+              (relationships<- (sync-nodes node (node (id node) (car (graphs result)))) :limit-to limit-to)))
         rels)))
 
 
