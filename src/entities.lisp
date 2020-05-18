@@ -128,7 +128,7 @@
       node
     (if limit-to
         (remove-if-not (lambda (rel)
-                         (format t "~a~%" (find (rel-type rel) limit-to :test #'string=))
+                         ;(format t "~a~%" (find (rel-type rel) limit-to :test #'string=))
                          (find (rel-type rel) limit-to :test #'string=))
                        relationships->)
         relationships->)))
