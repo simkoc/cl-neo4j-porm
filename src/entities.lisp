@@ -28,7 +28,7 @@
                                    (car elem)
                                    (string-downcase (format nil "~a" (car elem))))
                                table)
-                          (cdr elem)))
+                          (remove #\~ (cdr elem))))
             element-list)
     table))
 
@@ -84,6 +84,7 @@
                :reader properties)
    (id :initarg :id
        :reader id)))
+
 
 (defmethod entity= ((node-lhs graph-entity) (node-rhs graph-entity) &rest nodes)
   (labels ((helper (a b rem)

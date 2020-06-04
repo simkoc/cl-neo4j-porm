@@ -82,7 +82,8 @@
 
 (defmethod simple-query ((connection neo4j-connection) statement &rest parameters)
   (query-request connection
-                 (make-requestable-query statement parameters nil)))
+                 (make-requestable-query statement parameters nil)
+                 nil))
 
 
 (defmethod graph-query ((connection neo4j-connection) statement &rest parameters)
