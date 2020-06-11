@@ -28,7 +28,9 @@
                                    (car elem)
                                    (string-downcase (format nil "~a" (car elem))))
                                table)
-                          (remove #\~ (cdr elem))))
+                      (if (stringp (cdr elem))
+                          (remove #\~ (cdr elem))
+                          (cdr elem))))
             element-list)
     table))
 
